@@ -1,50 +1,53 @@
-// 設定
-function getConfig() {
-  return {
-    spreadSheetId: '',
-    spreadSheetTabName: ''
-  }
-}
+var calendarId = PropertiesService
+  .getScriptProperties()
+  .getProperty('CALENDAR_ID');
 
-// カレンダーにイベントを登録
-function registerAll() {
-  var config      = getConfig();
-  var spreadSheet = SpreadsheetApp.openById(config.spreadSheetId);
-  var sheet       = spreadSheet.getSheetByName(config.spreadSheetTabName);
-  var eventIds = sheet
+function registerEvents() {
+  var values = SpreadsheetApp
+    .getActiveSheet()
     .getDataRange()
-    .getValues()
-    .filter(function (e, i) {
-      return i !== 0 && e[6] === '';
-    }).map(function (e) {
-      var calendarEvent = CalendarApp.getDefaultCalendar().createEvent(
-        e[0], e[1], e[2],
+    .getValues();
+
+  values.shift();
+
+  var eventIds = values.map(function (e) {
+    var event = CalendarApp
+      .getCalendarById(calendarId)
+      .createEvent(
+        e[0],
+        new Date(e[4] + 'T' + e[5]),
+        new Date(e[4] + 'T' + e[6]),
         {
-          description: e[3],
-          location: e[4],
-          guests: e[5]
-        });
-      return [calendarEvent.getId()];
-    });
+          description: e[1] + '<br>Speaker: ' + e[2],
+          location: e[3],
+        }
+      );
+    return [event.getId()];
+  });
 
-  if (eventIds.length === 0) return;
-
-  sheet.getRange('G2:G' + (eventIds.length+1) ).setValues(eventIds);
+  SpreadsheetApp
+    .getActiveSheet()
+    .getRange('H2:H' + (eventIds.length+1))
+    .setValues(eventIds);
 }
 
-// 登録されたイベントをキャンセルして、シートから削除
-function cancelAll() {
-  var range       = 'G2:G1000';
-  var config      = getConfig();
-  var spreadSheet = SpreadsheetApp.openById(config.spreadSheetId);
-  var sheet       = spreadSheet.getSheetByName(config.spreadSheetTabName);
-  sheet
-    .getRange(range)
-    .getValues()
-    .filter(function (eventId) {
-      return eventId[0] !== '';
-    }).forEach(function (id) {
-      CalendarApp.getDefaultCalendar().getEventById(id).deleteEvent();
-    });
-  sheet.getRange(range).clear();
+function deleteEvents() {
+  var values = SpreadsheetApp
+    .getActiveSheet()
+    .getDataRange()
+    .getValues();
+
+  values.shift();
+
+  values.forEach(function (event) {
+    CalendarApp
+      .getCalendarById(calendarId)
+      .getEventById(event[7])
+      .deleteEvent();
+  });
+
+  SpreadsheetApp
+    .getActiveSheet()
+    .getRange('H2:H' + (values.length+1))
+    .clear();
 }
